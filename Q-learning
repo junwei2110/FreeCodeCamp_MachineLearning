@@ -1,0 +1,91 @@
+# The strategy is to deploy the q-table using q-learning
+# There will be only 3 actions: Rock, Paper or Scissors
+# For the states, we shall use the input and output for the previous round. The input is the output for the previous previous round. So 3^2 means there are 9 states: PP, PS, PR, SP, SS, SR, RP, RS, RR
+
+# Note that to import functions over, you need to manage your global variables and local variables well
+# Global variables should just be constants
+# Local variables are variables that can be changed
+
+import numpy as np
+
+STATES = 9
+ACTIONS = 3
+STATE_KEYS = {"PP":0, "PS":1, "PR":2, "SP":3, "SS":4, "SR":5,"RP":6, "RS":7, "RR":8,}
+ACTION_KEYS = {0:"R", 1:"P", 2:"S"}
+
+LEARNING_RATE = 0.8
+GAMMA = 0.9
+eps_num = 0.9
+NO_OF_TRIALS = 1001
+
+WIN_CONDITION = {"R":"S", "S":"P", "P":"R"}
+LOSE_CONDITION = {"R":"P", "S":"R", "P":"S"}
+FIRST_GUESS = "R"
+FIRST_STATE = 0
+
+
+# Interesting note: If you put a numeric value inside a function inputs, the input will be refreshed whenever the function is triggered, i.e. epsilon = 0.8 will cause epsilon to always be 0.8 when the function refreshes, regardless of what happens to epsilon within the function
+
+# However, if you want continuity whenever the function is triggered, use an array instead. The array will become a global variable and its last value will be stored in the overall code instead of just within the function
+
+def player(prev_play, opponent_history=[], player_guesses = [], 
+Q = np.zeros((STATES, ACTIONS)), EPSILON = [eps_num], num_trials = NO_OF_TRIALS):
+
+    opponent_history.append(prev_play)
+
+    # We define the current state which is essentially the player's previous guess
+    if (len(player_guesses)%num_trials == 0) | (len(player_guesses) < 2):
+      state = FIRST_STATE
+    else:
+      state = STATE_KEYS[player_guesses[-2] + player_guesses[-1]]
+
+    # We recall the player's previous guess
+    if (len(player_guesses)%num_trials == 0) | (len(player_guesses) < 1):
+      player_prev_guess = FIRST_GUESS
+    else:
+      player_prev_guess = player_guesses[-1] 
+    
+    # We create the reward system
+    if (len(player_guesses)%num_trials == 0) | (len(player_guesses) < 1):
+      reward = 0
+    elif WIN_CONDITION[player_prev_guess] == prev_play:
+      reward = 1
+    elif LOSE_CONDITION[player_prev_guess] == prev_play:
+      reward = -1
+    else:
+      reward = 0
+
+    # Now we initiate a guess
+    # We add the randomness at the start of every new opponent
+    if (np.random.uniform(0,1) < EPSILON[0]) | (prev_play == ""):  
+      
+      action = np.random.randint(0,3)
+      guess = ACTION_KEYS[action]
+    
+    # This is if we use the q-table to make the guess
+    else:
+      action = np.argmax(Q[state,:]) 
+      guess = ACTION_KEYS[action]
+    
+
+    # We will take the next state as the current guess 
+    if (len(player_guesses)%num_trials == 0) | (len(player_guesses) < 1):
+      next_state = STATE_KEYS[FIRST_GUESS + guess]
+    else:    
+      next_state = STATE_KEYS[player_guesses[-1] + guess]
+    
+    # We then update the q-table
+    Q[state, action] = Q[state, action] + LEARNING_RATE * (reward + GAMMA * np.max(Q[next_state,:]) - Q[state,action])    
+
+    # We also append the player_guesses matrix
+    player_guesses.append(guess)
+
+    # We have to deduct the EPSILON
+    EPSILON[0] = EPSILON[0] - 0.01
+
+    # We need to refresh the global variables: epsilon, Q for the new opponents
+    if len(player_guesses)%num_trials == 0:
+      EPSILON[0] = eps_num
+      Q[:,:] = 0 
+    
+    return guess
