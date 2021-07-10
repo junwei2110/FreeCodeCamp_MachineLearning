@@ -1,0 +1,104 @@
+# For this case, we will try double q-learning
+# See link: https://towardsdatascience.com/double-q-learning-the-easy-way-a924c4085ec3
+# The problem with q-learning is that it tends to overestimate
+# Q-learning takes the max value from all the possible routes, and the final outcome is the expected max value of the possible routes.
+# However, the true outcome we want should be the max expected value. See the difference? If we take the expected max value, our value will always be skewed towards the max, which results in an overestimation
+
+
+import numpy as np
+import random
+
+STATES = 9
+ACTIONS = 3
+STATE_KEYS = {"PP":0, "PS":1, "PR":2, "SP":3, "SS":4, "SR":5,"RP":6, "RS":7, "RR":8}
+ACTION_KEYS = {0:"R", 1:"P", 2:"S"}
+
+LEARNING_RATE = 1
+GAMMA = 0.6
+eps_num = 0.8
+NO_OF_TRIALS = 1001
+
+WIN_CONDITION = {"R":"S", "S":"P", "P":"R"}
+LOSE_CONDITION = {"R":"P", "S":"R", "P":"S"}
+FIRST_GUESS = "R"
+FIRST_STATE = 0
+
+
+# Interesting note: If you put a numeric value inside a function inputs, the input will be refreshed whenever the function is triggered, i.e. epsilon = 0.8 will cause epsilon to always be 0.8 when the function refreshes, regardless of what happens to epsilon within the function
+
+# However, if you want continuity whenever the function is triggered, use an array instead. The array will become a global variable and its last value will be stored in the overall code instead of just within the function
+def player(prev_play, opponent_history=[], player_guesses = [], 
+Q_A = np.zeros((STATES, ACTIONS)), Q_B = np.zeros((STATES, ACTIONS)),
+EPSILON = [eps_num], num_trials = NO_OF_TRIALS):
+
+    opponent_history.append(prev_play)
+
+    # We define the current state which is essentially the player's previous guess
+    if (len(player_guesses)%num_trials == 0) | (len(player_guesses) < 2):
+      state = FIRST_STATE
+    else:
+      state = STATE_KEYS[player_guesses[-2] + player_guesses[-1]]
+
+    # We recall the player's previous guess
+    if (len(player_guesses)%num_trials == 0) | (len(player_guesses) < 2):
+      player_prev_guess = FIRST_GUESS
+    else:
+      player_prev_guess = player_guesses[-1] 
+    
+    # We create the reward system
+    if (len(player_guesses)%num_trials == 0) | (len(player_guesses) < 2):
+      reward = 0
+    elif WIN_CONDITION[player_prev_guess] == prev_play:
+      reward = 1
+    elif LOSE_CONDITION[player_prev_guess] == prev_play:
+      reward = -1
+    else:
+      reward = 0
+
+    # Now we initiate a guess
+    # We add the randomness at the start of every new opponent
+    if (np.random.uniform(0,1) < EPSILON[0]) | (prev_play == ""):  
+      
+      action = np.random.randint(0,3)
+      guess = ACTION_KEYS[action]
+    
+    # Using q-table to decide the next action
+    # For double q-learning method, we need to take into account both Q_A and Q_B
+    else:
+      Q_Total = Q_A + Q_B
+      action = np.argmax(Q_Total[state,:]) 
+      guess = ACTION_KEYS[action]
+    
+
+    # We will take the next state as the current guess 
+    if (len(player_guesses)%num_trials == 0) | (len(player_guesses) < 1):
+      next_state = STATE_KEYS[FIRST_GUESS + guess]
+    else:    
+      next_state = STATE_KEYS[player_guesses[-1] + guess]
+    
+    # We then update the q-tables
+    # We use the following methodology
+    # We randomize which matrix Q_A or Q_B to update
+    # Then we update Q_A using Q_B values and vice versa to reduce the effects of overestimation found in the Q-learning method
+    Rand_int = random.choice([0,1])
+    
+    if Rand_int == 0: # Update Q_A
+          Q_A[state, action] = Q_A[state, action] + LEARNING_RATE * (reward + GAMMA * np.max(Q_B[next_state,:]) - Q_A[state,action])   
+    if Rand_int == 1: # Update Q_B
+          Q_B[state, action] = Q_B[state, action] + LEARNING_RATE * (reward + GAMMA * np.max(Q_A[next_state,:]) - Q_B[state,action])
+ 
+
+    # We also append the player_guesses matrix
+    player_guesses.append(guess)
+
+    # We have to deduct the EPSILON
+    EPSILON[0] = EPSILON[0] - 0.01
+
+    # We need to refresh the global variables: epsilon, Q for the new opponents
+    if len(player_guesses)%num_trials == 0:
+      EPSILON[0] = eps_num
+      Q_A[:,:] = 0
+      Q_B[:,:] = 0 
+    
+
+    return guess
