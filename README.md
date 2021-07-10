@@ -6,3 +6,4 @@ Exercises include:
 2) Book Recommendation Engine using KNN
 3) Linear Regression Health Costs Calculator
 4) Neural Network SMS Text Classifier
+5) Rock Paper Scissors AI through Q-learning
